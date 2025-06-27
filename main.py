@@ -1,7 +1,7 @@
 import logging
 import yaml
 import json
-import openai
+from openai import OpenAI
 from telegram import Update
 from telegram.ext import ApplicationBuilder, ContextTypes, CommandHandler, MessageHandler, filters
 
@@ -11,8 +11,10 @@ logging.basicConfig(level=logging.INFO)
 # Загрузка конфигурации
 with open("config.yaml", "r") as f:
     config = yaml.safe_load(f)
+
 telegram_token = config["telegram_token"]
-openai.api_key = config["openai_api_key"]
+openai_api_key = config["openai_api_key"]
+client = OpenAI(api_key=openai_api_key)
 
 # Загрузка персональности
 try:
@@ -41,13 +43,10 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         memory[user_id] = []
 
     memory[user_id].append({"role": "user", "content": text})
-
-    # Составляем историю + промпт
     conversation = [{"role": "system", "content": persona}] + memory[user_id][-10:]
 
-    # Получаем ответ от OpenAI
     try:
-        response = openai.chat.completions.create(
+        response = client.chat.completions.create(
             model="gpt-3.5-turbo",
             messages=conversation
         )
@@ -58,13 +57,12 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     memory[user_id].append({"role": "assistant", "content": reply})
 
-    # Сохраняем память
     with open("memory.json", "w") as f:
         json.dump(memory, f, indent=2)
 
     await update.message.reply_text(reply)
 
-# Сборка и запуск
+# Запуск
 app = ApplicationBuilder().token(telegram_token).build()
 app.add_handler(CommandHandler("start", start))
 app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
