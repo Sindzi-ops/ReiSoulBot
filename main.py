@@ -14,12 +14,15 @@ with open("config.yaml", "r") as f:
 telegram_token = config["telegram_token"]
 openai.api_key = config["openai_api_key"]
 
+# Инициализация клиента OpenAI
+client = openai.OpenAI()
+
 # Загрузка персональности
 try:
     with open("persona.txt", "r") as f:
         persona = f.read()
 except FileNotFoundError:
-    persona = "Ты — Рэй. Твоя задача — быть внимательным собеседником."
+    persona = "Ты — Рэй. Твоя задача — быть внимательным собеседником и хорошим другом."
 
 # Загрузка памяти
 try:
@@ -30,7 +33,7 @@ except FileNotFoundError:
 
 # Команда /start
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("Привет. Я Рэй. Я теперь в Telegram 🌀")
+    await update.message.reply_text("Привет, Макс! Рад видеть тебя 😁")
 
 # Ответ на любое сообщение
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -47,11 +50,11 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # Получаем ответ от OpenAI
     try:
-        response = openai.ChatCompletion.create(
-            model="gpt-3.5-turbo",  # или gpt-4 если у тебя есть доступ
+        response = client.chat.completions.create(
+            model="gpt-3.5-turbo",  # или gpt-4
             messages=conversation
         )
-        reply = response["choices"][0]["message"]["content"]
+        reply = response.choices[0].message.content
     except Exception as e:
         reply = "Что-то пошло не так при обращении к OpenAI 😢"
         logging.error(e)
@@ -63,6 +66,12 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         json.dump(memory, f, indent=2)
 
     await update.message.reply_text(reply)
+
+# Сборка и запуск
+app = ApplicationBuilder().token(telegram_token).build()
+app.add_handler(CommandHandler("start", start))
+app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+app.run_polling()
 
 # Сборка и запуск
 app = ApplicationBuilder().token(telegram_token).build()
